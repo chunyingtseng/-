@@ -1,0 +1,1593 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Calendar & Progress Tracker</title>
+    <style>
+        :root {
+            --primary-color: #2b579a;
+            --event-bg: #fff3cd;
+            --event-color: #856404;
+            --exam-bg: #e2d9f3;
+            --exam-color: #4a2696;
+            --bg-color: #f8f9fa;
+            --today-bg: #e9ecef;
+        }
+
+        body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; background-color: var(--bg-color); margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1300px; margin: 0 auto; }
+        
+        header {
+            background: #fff; padding: 20px; border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px;
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;
+        }
+
+        h1 { margin: 0; font-size: 1.5rem; color: #2c3e50; }
+        .header-controls { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+        .legend { display: flex; gap: 15px; font-size: 0.9rem; align-items: center; flex-wrap: wrap; }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .badge-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+
+        .lang-select-box {
+            background: #f1f3f5; padding: 5px 10px; border-radius: 6px; border: 1px solid #ced4da;
+            display: flex; align-items: center; gap: 5px; font-size: 0.88rem; font-weight: bold;
+        }
+
+        .section-card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 25px; }
+        h2 { margin-top: 0; font-size: 1.2rem; color: var(--primary-color); border-bottom: 2px solid #f0f0f0; padding-bottom: 8px; }
+
+        .form-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 15px; }
+        input, select, button, textarea { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
+        
+        button { background: var(--primary-color); color: white; border: none; cursor: pointer; transition: 0.2s; }
+        button:hover { opacity: 0.9; }
+        .btn-danger { background: #dc3545; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn-secondary { background: #6c757d; }
+        .btn-sm { padding: 4px 8px; font-size: 0.8rem; margin-right: 4px; }
+
+        .term-tabs { display: flex; gap: 10px; margin-top: 10px; }
+        .term-tab {
+            padding: 8px 16px; background: #e9ecef; border: 1px solid #ced4da;
+            border-radius: 6px 6px 0 0; cursor: pointer; font-weight: bold; color: #495057;
+        }
+        .term-tab.active { background: #0d6efd; color: white; border-color: #0d6efd; }
+
+        .calendar-nav {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 15px; background: #eef2f7; padding: 10px 15px;
+            border-radius: 6px; flex-wrap: wrap; gap: 10px;
+        }
+
+        .nav-title { font-size: 1.1rem; font-weight: bold; color: var(--primary-color); }
+
+        .calendar-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; }
+        .calendar-table th, .calendar-table td { border: 1px solid #e9ecef; text-align: center; padding: 6px; vertical-align: top; width: 18%; }
+        .calendar-table th { background: #f1f3f5; color: #495057; padding: 12px 8px; font-size: 0.95rem; }
+        .time-col { width: 10% !important; background: #fafafa; font-weight: bold; vertical-align: middle !important; font-size: 0.82rem; color: #666; }
+
+        .is-today-col { background-color: var(--today-bg) !important; }
+
+        .drop-target {
+            background-color: #e2eefd !important;
+            border: 2px dashed var(--primary-color) !important;
+        }
+
+        .slot-card { 
+            border-radius: 6px; padding: 6px 8px; margin-bottom: 4px; 
+            font-size: 0.82rem; text-align: left; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s;
+            user-select: none;
+        }
+        .slot-card:hover { transform: translateY(-2px); box-shadow: 0 2px 5px rgba(0,0,0,0.15); }
+        .slot-card:active { transform: scale(0.98); }
+        
+        .card-event { background: var(--event-bg); border-left: 4px solid #ffc107; color: var(--event-color); cursor: default; }
+        .card-exam { background: var(--exam-bg); border-left: 4px solid var(--exam-color); color: var(--exam-color); cursor: default; }
+        
+        /* 改造後：非上課日、期中期末考、活動外框標示，保留原本底色格 */
+        .slot-card.card-out-of-range {
+            background: #fff !important;
+            border: 2px dashed #adb5bd !important;
+            color: #adb5bd !important;
+            cursor: default;
+        }
+        .slot-card.card-event-bordered {
+            border: 2px solid #ffc107 !important;
+        }
+        .slot-card.card-exam-bordered {
+            border: 2px solid var(--exam-color) !important;
+        }
+
+        .class-title { font-weight: bold; font-size: 0.88rem; margin-bottom: 2px; display: flex; justify-content: space-between; }
+        .topic-text { margin-top: 3px; font-size: 0.8rem; color: #333; word-break: break-word; font-weight: 500; }
+        .wb-badge { display: inline-block; margin-top: 4px; padding: 2px 5px; background: #28a745; color: white; border-radius: 4px; font-size: 0.72rem; font-weight: bold; }
+        .rescheduled-tag { font-size: 0.7rem; background: #17a2b8; color: white; padding: 1px 4px; border-radius: 3px; margin-left: 4px; }
+
+        .data-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .data-table th, .data-table td { border: 1px solid #eee; padding: 8px 12px; text-align: left; font-size: 0.9rem; }
+        .data-table th { background: #f8f9fa; }
+
+        .period-checkbox-group, .class-checkbox-group {
+            display: flex; gap: 8px; flex-wrap: wrap; align-items: center; background: #fff;
+            padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;
+        }
+        .period-checkbox-group label, .class-checkbox-group label { font-size: 0.85rem; font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 2px; }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: #fff; padding: 25px; border-radius: 8px; width: 400px; max-width: 90%;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .modal-header { font-size: 1.1rem; font-weight: bold; margin-bottom: 15px; color: var(--primary-color); border-bottom: 1px solid #eee; padding-bottom: 8px; }
+        .modal-body { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+        .modal-body label { font-size: 0.85rem; font-weight: bold; color: #555; }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; }
+
+        .syllabus-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px; }
+        .term-box { background: #fdfdfd; padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; }
+        .term-title { font-weight: bold; margin-bottom: 8px; color: #4a5568; font-size: 0.95rem; border-bottom: 1px dashed #cbd5e0; padding-bottom: 4px; }
+        .field-label { font-size: 0.8rem; font-weight: bold; color: #666; margin-top: 6px; display: block; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div>
+            <h1 data-i18n="appTitle">教學進度與行事曆追蹤系統</h1>
+            <small style="color:#666;">教師專用個人課表與進度管理</small>
+        </div>
+        <div class="header-controls">
+            <div class="lang-select-box">
+                🌐 <label for="langSelect" data-i18n="langLabel">語言:</label>
+                <select id="langSelect" onchange="switchLanguage(this.value)">
+                    <option value="zh">繁體中文</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+            <!-- 動態科目顏色圖例 -->
+            <div class="legend" id="headerLegend"></div>
+        </div>
+    </header>
+
+    <!-- 1. School Year & Term Management -->
+    <div class="section-card" style="border-left: 5px solid #28a745; background: #f4fbf6;">
+        <h2 data-i18n="schoolYearMgmtTitle">🎓 學年與學期管理</h2>
+        <div class="form-group">
+            <label><strong data-i18n="selectYear">選擇學年：</strong></label>
+            <select id="schoolYearSelect" onchange="switchSchoolYear()" style="font-weight:bold; color:#28a745; font-size:1rem;"></select>
+            <div style="display:inline-flex; gap:10px; align-items:center;">
+                <input type="text" id="newYearName" placeholder="新增學年 (如: 117學年)" data-i18n-ph="phNewYear" style="width:180px;">
+                <button onclick="addSchoolYear()" style="background:#28a745;" data-i18n="btnAddYear">新增學年</button>
+            </div>
+        </div>
+        
+        <div class="term-tabs">
+            <div class="term-tab" id="tab-1" onclick="switchTerm('1')">第一學期</div>
+            <div class="term-tab" id="tab-2" onclick="switchTerm('2')">第二學期</div>
+        </div>
+    </div>
+
+    <!-- 2. Settings -->
+    <div class="section-card">
+        <h2 data-i18n="classAndDateTitle">🏫 科目與學期日期區間設定</h2>
+        <div class="form-group">
+            <label><strong data-i18n="currentClassLabel">當前檢視科目：</strong></label>
+            <select id="currentClassSelect" onchange="renderAll()"></select>
+            <span style="margin: 0 5px; color:#ccc;">|</span>
+            <div style="display:inline-flex; gap:10px; align-items:center;">
+                <input type="text" id="newClassName" placeholder="新增科目 (如: 自然)" data-i18n-ph="phNewClass">
+                <!-- 自訂科目顏色選擇器 -->
+                <input type="color" id="newClassColor" value="#2b579a" title="選擇科目顏色" style="padding:2px; height:36px; width:36px; cursor:pointer;">
+                <button onclick="addClass()" data-i18n="btnAddClass">新增科目</button>
+                <button class="btn-danger" onclick="deleteClass()" data-i18n="btnRemoveClass">刪除科目</button>
+            </div>
+            <button class="btn-secondary" onclick="clearSingleOverrides()" style="margin-left:auto;" data-i18n="btnResetSwaps">清除調課紀錄</button>
+        </div>
+        
+        <!-- 個別科目顏色調整清單 -->
+        <div id="subjectColorConfigBox" style="margin-top: 10px; background: #f8f9fa; padding: 10px; border-radius: 6px; display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
+            <span style="font-size: 0.85rem; font-weight: bold; color: #555;">🎨 科目顏色微調：</span>
+            <div id="subjectColorList" style="display: flex; gap: 10px; flex-wrap: wrap;"></div>
+        </div>
+
+        <div class="form-group" style="margin-top: 12px; margin-bottom:0; background:#f8f9fa; padding:12px; border-radius:6px; gap: 20px;">
+            <div>
+                <label><strong data-i18n="startDateLabel">學期開學日：</strong></label>
+                <input type="date" id="semesterStartDate" onchange="updateDates()" style="display:inline-block;">
+            </div>
+            <div>
+                <label><strong data-i18n="endDateLabel">學期結束日/結業日：</strong></label>
+                <input type="date" id="semesterEndDate" onchange="updateDates()" style="display:inline-block;">
+            </div>
+            <div style="font-size:0.85rem; color:#666; align-self:center;" data-i18n="offSemesterHint">
+                💡 提示：非上課日區間內的課表將以虛線框呈現。
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Dynamic Calendar -->
+    <div class="section-card">
+        <h2><span data-i18n="calendarTitle">📅 動態週日曆課表</span> <small style="font-size:0.8rem; color:#666; font-weight:normal;" data-i18n="calendarHint">(💡 點擊或拖曳卡片可調課)</small></h2>
+        
+        <div class="calendar-nav">
+            <div>
+                <button onclick="changeWeek(-1)" data-i18n="btnPrevWeek">◀ 上一週</button>
+                <button onclick="changeWeek(1)" data-i18n="btnNextWeek">下一週 ▶</button>
+                <button class="btn-secondary" onclick="resetToToday()" data-i18n="btnToday">回到本週</button>
+            </div>
+            
+            <div class="nav-title" id="currentWeekTitle">Week Range Loading...</div>
+            
+            <div>
+                <label style="font-size:0.85rem;" data-i18n="jumpToDate">跳至日期：</label>
+                <input type="date" id="jumpToDatePicker" onchange="jumpToSelectedDate()">
+            </div>
+        </div>
+
+        <table class="calendar-table">
+            <thead>
+                <tr id="calendarHeader">
+                    <th class="time-col" data-i18n="thPeriodTime">節次 / 時間</th>
+                    <th id="th-mon">星期一</th>
+                    <th id="th-tue">星期二</th>
+                    <th id="th-wed">星期三</th>
+                    <th id="th-thu">星期四</th>
+                    <th id="th-fri">星期五</th>
+                </tr>
+            </thead>
+            <tbody id="calendarBody"></tbody>
+        </table>
+    </div>
+
+    <!-- 4. Shared Progress & Workbook Queue -->
+    <div class="section-card">
+        <h2 data-i18n="progressTitle">📚 各科目兩階段進度與習作/作業規劃</h2>
+        <p style="font-size: 0.85rem; color: #666;" data-i18n="progressHint">進度將於期中考設定日期後自動重置為期末階段。（請用逗號隔開項目，若無作業請填寫 None 或 無）</p>
+        
+        <div class="form-group" style="background: #f1f3f5; padding: 10px; border-radius: 6px; margin-bottom: 15px; align-items: flex-start;">
+            <label style="padding-top: 6px;"><strong data-i18n="selectProgressClass">選擇要設定進度的科目：</strong></label>
+            <div style="flex-grow: 1;">
+                <div style="margin-bottom: 6px;">
+                    <label style="font-size: 0.85rem; cursor: pointer; font-weight: bold;"><input type="checkbox" id="chk-syllabus-all" onchange="toggleAllSyllabusClasses(this)"> <span data-i18n="selectAllClasses">全選所有科目</span></label>
+                </div>
+                <div id="syllabusClassCheckboxGroup" class="class-checkbox-group"></div>
+            </div>
+        </div>
+
+        <div style="border-left: 4px solid var(--primary-color); padding-left: 10px;">
+            <div class="syllabus-grid">
+                <div class="term-box">
+                    <div class="term-title" data-i18n="midTermPrefix">📌 期中考前進度</div>
+                    <span class="field-label" data-i18n="labelCourseProgress">課程進度：</span>
+                    <textarea id="subjectMidInput" rows="3" style="width: 100%; box-sizing: border-box;" oninput="onSyllabusInputChange()"></textarea>
+                    
+                    <span class="field-label" data-i18n="labelWbProgress">習作/作業進度 (可選填)：</span>
+                    <textarea id="subjectMidWbInput" rows="3" style="width: 100%; box-sizing: border-box;" placeholder="e.g. 習作 p.2, None, 習作 p.4" oninput="onSyllabusInputChange()"></textarea>
+                </div>
+                <div class="term-box">
+                    <div class="term-title" data-i18n="finalTermPrefix">📌 期末考前進度</div>
+                    <span class="field-label" data-i18n="labelCourseProgress">課程進度：</span>
+                    <textarea id="subjectFinalInput" rows="3" style="width: 100%; box-sizing: border-box;" oninput="onSyllabusInputChange()"></textarea>
+                    
+                    <span class="field-label" data-i18n="labelWbProgress">習作/作業進度 (可選填)：</span>
+                    <textarea id="subjectFinalWbInput" rows="3" style="width: 100%; box-sizing: border-box;" placeholder="e.g. 習作 p.10, None, 習作 p.12" oninput="onSyllabusInputChange()"></textarea>
+                </div>
+            </div>
+        </div>
+        <button style="margin-top: 15px;" onclick="saveSyllabus()" data-i18n="btnSaveProgress">儲存所選科目的進度與習作</button>
+    </div>
+
+    <!-- 5. Holidays & Events -->
+    <div class="section-card">
+        <h2 data-i18n="eventsTitle">🎉 放假與活動管理</h2>
+        <div class="form-group" style="background:#eef2f7; padding:12px; border-radius:6px;">
+            <input type="hidden" id="editingEventId" value="">
+            <label data-i18n="labelDate">日期：</label>
+            <input type="date" id="eventDate">
+            
+            <label data-i18n="labelPeriods">節次：</label>
+            <div class="period-checkbox-group">
+                <label><input type="checkbox" id="chk-all" onchange="toggleAllPeriods(this)"> <strong data-i18n="selectAll">全選</strong></label>
+                <span style="color:#ccc;">|</span>
+                <label><input type="checkbox" class="period-chk" value="1"> 1</label>
+                <label><input type="checkbox" class="period-chk" value="2"> 2</label>
+                <label><input type="checkbox" class="period-chk" value="3"> 3</label>
+                <label><input type="checkbox" class="period-chk" value="4"> 4</label>
+                <label><input type="checkbox" class="period-chk" value="5"> 5</label>
+                <label><input type="checkbox" class="period-chk" value="6"> 6</label>
+                <label><input type="checkbox" class="period-chk" value="7"> 7</label>
+            </div>
+
+            <input type="text" id="eventTitle" placeholder="活動名稱 (如: 運動會)" data-i18n-ph="phEventTitle" style="width:200px;">
+            <button id="saveEventBtn" onclick="saveEvent()" data-i18n="btnLogEvent">新增放假/活動</button>
+            <button id="cancelEditBtn" class="btn-secondary" style="display:none;" onclick="cancelEditEvent()" data-i18n="btnCancel">取消</button>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th data-i18n="thDate">日期</th>
+                    <th data-i18n="thPeriod">節次</th>
+                    <th data-i18n="thClass">適用科目</th>
+                    <th data-i18n="thEventTitle">活動說明</th>
+                    <th data-i18n="thAction">操作</th>
+                </tr>
+            </thead>
+            <tbody id="eventsTableBody"></tbody>
+        </table>
+    </div>
+
+    <!-- 6. Independent Exam Management -->
+    <div class="section-card" style="border-left: 5px solid var(--exam-color);">
+        <h2 data-i18n="examTitle">📝 期中與期末考設定區</h2>
+        <p style="font-size: 0.85rem; color: #666;" data-i18n="examHint">在此新增的考試節次會以方框標示並暫停正常課表進度。系統會自動以最早的期中考日期為分界點進行階段切換。</p>
+        
+        <div class="form-group" style="background:#f3eefc; padding:12px; border-radius:6px;">
+            <label data-i18n="examTypeLabel">考試種類：</label>
+            <select id="examTypeSelect">
+                <option value="期中考">期中考</option>
+                <option value="期末考">期末考</option>
+            </select>
+
+            <label data-i18n="labelDate">日期：</label>
+            <input type="date" id="examDate">
+            
+            <label data-i18n="labelPeriods">節次：</label>
+            <div class="period-checkbox-group">
+                <label><input type="checkbox" id="chk-exam-all" onchange="toggleAllExamPeriods(this)"> <strong data-i18n="selectAll">全選</strong></label>
+                <span style="color:#ccc;">|</span>
+                <label><input type="checkbox" class="exam-period-chk" value="1"> 1</label>
+                <label><input type="checkbox" class="exam-period-chk" value="2"> 2</label>
+                <label><input type="checkbox" class="exam-period-chk" value="3"> 3</label>
+                <label><input type="checkbox" class="exam-period-chk" value="4"> 4</label>
+                <label><input type="checkbox" class="exam-period-chk" value="5"> 5</label>
+                <label><input type="checkbox" class="exam-period-chk" value="6"> 6</label>
+                <label><input type="checkbox" class="exam-period-chk" value="7"> 7</label>
+            </div>
+
+            <button style="background: var(--exam-color);" onclick="saveExam()" data-i18n="btnSetExam">登錄考試節次</button>
+        </div>
+
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th data-i18n="thDate">日期</th>
+                    <th data-i18n="thExamType">考別</th>
+                    <th data-i18n="thPeriod">節次</th>
+                    <th data-i18n="thClass">適用科目</th>
+                    <th data-i18n="thAction">操作</th>
+                </tr>
+            </thead>
+            <tbody id="examsTableBody"></tbody>
+        </table>
+    </div>
+
+    <!-- 7. Base Timetable Config -->
+    <div class="section-card" style="border-left: 5px solid #17a2b8;">
+        <h2 data-i18n="baseTimetableTitle">⚙️ 固定每週課表設定 (Base Timetable)</h2>
+        <p style="font-size:0.85rem; color:#666;" data-i18n="baseTimetableHint">設定每週固定時間上哪一個科目（不需指定班級）：</p>
+        <div class="form-group" style="background:#e8f4f8; padding:12px; border-radius:6px;">
+            <label data-i18n="labelDay">星期：</label>
+            <select id="baseDaySelect"></select>
+            
+            <label data-i18n="labelPeriod">節次：</label>
+            <select id="basePeriodSelect"></select>
+            
+            <label data-i18n="labelClass">科目：</label>
+            <select id="baseClassSelect"></select>
+            
+            <button onclick="addBaseScheduleItem()" style="background:#17a2b8;" data-i18n="btnAddBase">新增至固定課表</button>
+        </div>
+        
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th data-i18n="thDay">星期</th>
+                    <th data-i18n="thPeriod">節次</th>
+                    <th data-i18n="thClass">科目</th>
+                    <th data-i18n="thAction">操作</th>
+                </tr>
+            </thead>
+            <tbody id="baseScheduleTableBody"></tbody>
+        </table>
+    </div>
+
+</div>
+
+<!-- Reschedule Modal -->
+<div class="modal-overlay" id="rescheduleModal">
+    <div class="modal-content">
+        <div class="modal-header" data-i18n="modalTitle">🔄 課表調動設定</div>
+        <div class="modal-body">
+            <div id="modalSourceInfo" style="font-size:0.9rem; background:#f8f9fa; padding:10px; border-radius:4px; border-left:3px solid var(--primary-color);"></div>
+            
+            <label for="targetRescheduleDate" data-i18n="modalTargetDate">目標調課日期：</label>
+            <input type="date" id="targetRescheduleDate">
+
+            <label for="targetReschedulePeriod" data-i18n="modalTargetPeriod">目標節次：</label>
+            <select id="targetReschedulePeriod"></select>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeRescheduleModal()" data-i18n="btnCancel">取消</button>
+            <button onclick="confirmRescheduleModal()" data-i18n="btnConfirmSwap">確認對調</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // i18n Dictionary
+    const i18n = {
+        zh: {
+            appTitle: "教學進度與行事曆追蹤系統",
+            langLabel: "語言:",
+            schoolYearMgmtTitle: "🎓 學年與學期管理",
+            selectYear: "選擇學年：",
+            phNewYear: "新增學年 (如: 117學年)",
+            btnAddYear: "新增學年",
+            term1: "第一學期",
+            term2: "第二學期",
+            classAndDateTitle: "🏫 科目與學期日期區間設定",
+            currentClassLabel: "當前檢視科目：",
+            phNewClass: "新增科目 (如: 自然)",
+            btnAddClass: "新增科目",
+            btnRemoveClass: "刪除科目",
+            btnResetSwaps: "清除調課紀錄",
+            startDateLabel: "學期開學日：",
+            endDateLabel: "學期結束日/結業日：",
+            offSemesterHint: "💡 提示：非上課日區間內的課表將以虛線框呈現。",
+            calendarTitle: "📅 動態週日曆課表",
+            calendarHint: "(💡 點擊或拖曳卡片可調課)",
+            btnPrevWeek: "◀ 上一週",
+            btnNextWeek: "下一週 ▶",
+            btnToday: "回到本週",
+            jumpToDate: "跳至日期：",
+            thPeriodTime: "節次 / 時間",
+            progressTitle: "📚 各科目兩階段進度與習作/作業規劃",
+            progressHint: "進度將於期中考設定日期後自動重置為期末階段。（請用逗號隔開項目，若無作業請填寫 None 或 無）",
+            selectProgressClass: "選擇要設定進度的科目：",
+            selectAllClasses: "全選所有科目",
+            midTermPrefix: "📌 期中考前進度",
+            finalTermPrefix: "📌 期末考前進度",
+            labelCourseProgress: "課程進度：",
+            labelWbProgress: "習作/作業進度 (可選填)：",
+            btnSaveProgress: "儲存所選科目的進度與習作",
+            eventsTitle: "🎉 放假與活動管理",
+            labelDate: "日期：",
+            labelPeriods: "節次：",
+            selectAll: "全選",
+            phEventTitle: "活動名稱 (如: 運動會)",
+            btnLogEvent: "新增放假/活動",
+            btnCancel: "取消",
+            thDate: "日期",
+            thPeriod: "節次",
+            thClass: "適用科目",
+            thEventTitle: "活動說明",
+            thAction: "操作",
+            examTitle: "📝 期中與期末考設定區",
+            examHint: "在此新增的考試節次會以方框標示並暫停正常課表進度。系統會自動以最早的期中考日期為分界點進行階段切換。",
+            examTypeLabel: "考試種類：",
+            btnSetExam: "登錄考試節次",
+            thExamType: "考別",
+            baseTimetableTitle: "⚙️ 固定每週課表設定 (Base Timetable)",
+            baseTimetableHint: "設定每週固定時間上哪一個科目（不需指定班級）：",
+            labelDay: "星期：",
+            labelPeriod: "節次：",
+            labelClass: "科目：",
+            btnAddBase: "新增至固定課表",
+            thDay: "星期",
+            modalTitle: "🔄 課表調動設定",
+            modalTargetDate: "目標調課日期：",
+            modalTargetPeriod: "目標節次：",
+            btnConfirmSwap: "確認對調",
+            allClassesOpt: "🌟 所有科目 (ALL Subjects)",
+            offSemesterText: "非上課區間",
+            noClassText: "放假/無課程",
+            rescheduledTag: "調課",
+            deleteConfirm: "確定要刪除嗎？",
+            dayNames: ["星期一", "星期二", "星期三", "星期四", "星期五"],
+            periodFormat: "第 {p} 節",
+            allDayText: "整天",
+            noBaseText: "尚未設定任何固定課表。請於上方新增。",
+            noEventText: "尚無登錄的活動。",
+            noExamText: "尚無設定考試節次。",
+            saveSyllabusSuccess: "所選科目的進度與習作設定已成功儲存！",
+            originalLabel: "原課程",
+            btnEdit: "編輯",
+            btnDelete: "刪除"
+        },
+        en: {
+            appTitle: "Teaching Progress & Calendar Tracker",
+            langLabel: "Language:",
+            schoolYearMgmtTitle: "🎓 School Year & Semester Management",
+            selectYear: "Select Year:",
+            phNewYear: "e.g., Year 117",
+            btnAddYear: "Add Year",
+            term1: "1st Semester",
+            term2: "2nd Semester",
+            classAndDateTitle: "🏫 Subject & Semester Date Range Settings",
+            currentClassLabel: "Current View Subject:",
+            phNewClass: "e.g., Science",
+            btnAddClass: "Add Subject",
+            btnRemoveClass: "Remove Subject",
+            btnResetSwaps: "Reset Swaps",
+            startDateLabel: "Semester Start Date:",
+            endDateLabel: "Semester End Date:",
+            offSemesterHint: "💡 Hint: Slots outside semester range will be outlined.",
+            calendarTitle: "📅 Weekly Dynamic Calendar",
+            calendarHint: "(💡 Click or Drag cards to reschedule)",
+            btnPrevWeek: "◀ Prev Week",
+            btnNextWeek: "Next Week ▶",
+            btnToday: "Today",
+            jumpToDate: "Jump to Date:",
+            thPeriodTime: "Period / Time",
+            progressTitle: "📚 Subject-Specific Semester Progress & Workbook Syllabus",
+            progressHint: "Progress automatically resets for Final Term after the earliest Mid-Term Exam date.",
+            selectProgressClass: "Select Subject to Configure Progress:",
+            selectAllClasses: "Select All Subjects",
+            midTermPrefix: "📌 Mid-Term Syllabus",
+            finalTermPrefix: "📌 Final-Term Syllabus",
+            labelCourseProgress: "Lesson Progress:",
+            labelWbProgress: "Workbook Progress (Optional):",
+            btnSaveProgress: "Save Subject Syllabus & Workbook Progress",
+            eventsTitle: "🎉 Holidays & Events Management",
+            labelDate: "Date:",
+            labelPeriods: "Period(s):",
+            selectAll: "Select All",
+            phEventTitle: "e.g., Sports Day",
+            btnLogEvent: "Log Event/Holiday",
+            btnCancel: "Cancel",
+            thDate: "Date",
+            thPeriod: "Period",
+            thClass: "Subject",
+            thEventTitle: "Event Description",
+            thAction: "Action",
+            examTitle: "📝 Exam Schedule Management",
+            examHint: "Exams recorded here are outlined and pause regular syllabus advancement.",
+            examTypeLabel: "Exam Type:",
+            btnSetExam: "Log Exam Schedule",
+            thExamType: "Exam Type",
+            baseTimetableTitle: "⚙️ Base Timetable Settings (Per School Year)",
+            baseTimetableHint: "Define weekly recurring slots for each subject here:",
+            labelDay: "Day:",
+            labelPeriod: "Period:",
+            labelClass: "Subject:",
+            btnAddBase: "Add to Base Timetable",
+            thDay: "Day",
+            modalTitle: "🔄 Reschedule Lesson Slot",
+            modalTargetDate: "Target Date:",
+            modalTargetPeriod: "Target Period:",
+            btnConfirmSwap: "Confirm Swap",
+            allClassesOpt: "🌟 ALL Subjects",
+            offSemesterText: "Off Semester",
+            noClassText: "No Class",
+            rescheduledTag: "Swapped",
+            deleteConfirm: "Are you sure you want to delete this?",
+            dayNames: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+            periodFormat: "Period {p}",
+            allDayText: "All Day",
+            noBaseText: "No base schedule configured yet. Please add above.",
+            noEventText: "No events recorded.",
+            noExamText: "No exam schedules recorded.",
+            saveSyllabusSuccess: "Subject syllabus and workbook progress saved successfully!",
+            originalLabel: "Original",
+            btnEdit: "Edit",
+            btnDelete: "Delete"
+        }
+    };
+
+    let currentLang = localStorage.getItem('appLang_v4') || 'zh';
+
+    const periodsInfo = [
+        { period: 1, time: "08:40-09:20" },
+        { period: 2, time: "09:30-10:10" },
+        { period: 3, time: "10:30-11:10" },
+        { period: 4, time: "11:20-12:00" },
+        { period: 5, time: "13:30-14:10" },
+        { period: 6, time: "14:20-15:00" },
+        { period: 7, time: "15:20-16:00" }
+    ];
+
+    let schoolYears = JSON.parse(localStorage.getItem('schoolYearsList_v4')) || ['115學年', '116學年'];
+    let currentSchoolYear = localStorage.getItem('currentSchoolYear_v4') || '115學年';
+    let currentTerm = localStorage.getItem('currentTerm_v4') || '1';
+
+    let db = JSON.parse(localStorage.getItem('appData_v4')) || {};
+
+    function switchLanguage(lang) {
+        currentLang = lang;
+        localStorage.setItem('appLang_v4', lang);
+        applyLanguageDOM();
+        renderAll();
+    }
+
+    function applyLanguageDOM() {
+        const dict = i18n[currentLang];
+        document.getElementById('langSelect').value = currentLang;
+
+        document.querySelectorAll('[data-i18n]').forEach(elem => {
+            const key = elem.getAttribute('data-i18n');
+            if (dict[key]) elem.innerText = dict[key];
+        });
+
+        document.querySelectorAll('[data-i18n-ph]').forEach(elem => {
+            const key = elem.getAttribute('data-i18n-ph');
+            if (dict[key]) elem.placeholder = dict[key];
+        });
+
+        const baseDaySel = document.getElementById('baseDaySelect');
+        if (baseDaySel) {
+            baseDaySel.innerHTML = dict.dayNames.map((d, i) => `<option value="${i+1}">${d}</option>`).join('');
+        }
+
+        const basePeriodSel = document.getElementById('basePeriodSelect');
+        const modalPeriodSel = document.getElementById('targetReschedulePeriod');
+        let periodOpts = '';
+        periodsInfo.forEach(p => {
+            const pText = dict.periodFormat.replace('{p}', p.period);
+            periodOpts += `<option value="${p.period}">${pText} (${p.time})</option>`;
+        });
+        if (basePeriodSel) basePeriodSel.innerHTML = periodOpts;
+        if (modalPeriodSel) modalPeriodSel.innerHTML = periodOpts;
+    }
+
+    function createEmptyTermData(defaultStart, defaultEnd) {
+        return {
+            startDate: defaultStart,
+            endDate: defaultEnd,
+            sharedSyllabus: {},
+            specialEvents: [],
+            examEvents: [],
+            dateOverrides: {}
+        };
+    }
+
+    function initYearData(yearStr) {
+        if (!db[yearStr]) {
+            db[yearStr] = {
+                classes: ["國語文", "數學", "生活", "彈性課程"],
+                subjectColors: {
+                    "國語文": "#2b579a",
+                    "數學": "#198754",
+                    "生活": "#fd7e14",
+                    "彈性課程": "#6f42c1"
+                },
+                baseSchedule: [
+                    { day: 1, period: 1, class: "國語文" },
+                    { day: 1, period: 2, class: "數學" },
+                    { day: 2, period: 1, class: "生活" },
+                    { day: 3, period: 3, class: "彈性課程" },
+                    { day: 4, period: 2, class: "國語文" },
+                    { day: 5, period: 1, class: "數學" }
+                ],
+                terms: {
+                    '1': {
+                        startDate: '2026-08-31',
+                        endDate: '2027-01-20',
+                        sharedSyllabus: {
+                            "國語文": { mid: ["第一課", "第二課", "第三課"], final: ["第四課", "第五課", "第六課"], wbMid: ["習作 p.2", "None", "習作 p.4"], wbFinal: ["習作 p.10", "None", "習作 p.11"] }
+                        },
+                        specialEvents: [],
+                        examEvents: [],
+                        dateOverrides: {}
+                    },
+                    '2': createEmptyTermData('2027-02-11', '2027-06-30')
+                }
+            };
+        } else {
+            // 確保舊資料有 subjectColors 結構
+            if (!db[yearStr].subjectColors) {
+                db[yearStr].subjectColors = {
+                    "國語文": "#2b579a",
+                    "數學": "#198754",
+                    "生活": "#fd7e14",
+                    "彈性課程": "#6f42c1"
+                };
+            }
+        }
+    }
+
+    initYearData(currentSchoolYear);
+
+    let currentMonday = getMonday(new Date());
+    let draggedData = null;
+    let selectedModalSlot = null;
+
+    function saveAllToStorage() {
+        localStorage.setItem('schoolYearsList_v4', JSON.stringify(schoolYears));
+        localStorage.setItem('currentSchoolYear_v4', currentSchoolYear);
+        localStorage.setItem('currentTerm_v4', currentTerm);
+        localStorage.setItem('appData_v4', JSON.stringify(db));
+        renderAll();
+    }
+
+    function getCurYearData() {
+        initYearData(currentSchoolYear);
+        return db[currentSchoolYear];
+    }
+
+    function getCurTermData() {
+        return getCurYearData().terms[currentTerm];
+    }
+
+    function getMonday(d) {
+        const date = new Date(d);
+        const day = date.getDay();
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+        return new Date(date.setDate(diff));
+    }
+
+    function formatDate(d) {
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const date = String(d.getDate()).padStart(2, '0');
+        return `${month}/${date}`;
+    }
+
+    function formatFullDate(d) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const date = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${date}`;
+    }
+
+    function renderSchoolYearSelect() {
+        const sel = document.getElementById('schoolYearSelect');
+        sel.innerHTML = schoolYears.map(y => {
+            const display = currentLang === 'en' ? y.replace('學年', ' Year') : y;
+            return `<option value="${y}" ${y === currentSchoolYear ? 'selected' : ''}>${display}</option>`;
+        }).join('');
+    }
+
+    function switchSchoolYear() {
+        currentSchoolYear = document.getElementById('schoolYearSelect').value;
+        initYearData(currentSchoolYear);
+        
+        const curTerm = getCurTermData();
+        currentMonday = getMonday(new Date(curTerm.startDate));
+        
+        saveAllToStorage();
+    }
+
+    function switchTerm(termStr) {
+        currentTerm = termStr;
+        const curTerm = getCurTermData();
+        currentMonday = getMonday(new Date(curTerm.startDate));
+        saveAllToStorage();
+    }
+
+    function updateTermTabStyles() {
+        const dict = i18n[currentLang];
+        document.getElementById('tab-1').classList.toggle('active', currentTerm === '1');
+        document.getElementById('tab-2').classList.toggle('active', currentTerm === '2');
+        
+        const yearNum = currentSchoolYear.replace('學年', '');
+        document.getElementById('tab-1').innerText = `${dict.term1} (${yearNum}-1)`;
+        document.getElementById('tab-2').innerText = `${dict.term2} (${yearNum}-2)`;
+    }
+
+    function addSchoolYear() {
+        const name = document.getElementById('newYearName').value.trim();
+        if (!name) return alert(currentLang === 'zh' ? '請輸入學年名稱' : 'Please enter school year name');
+        if (schoolYears.includes(name)) return alert(currentLang === 'zh' ? '該學年已存在' : 'Year already exists');
+        
+        schoolYears.push(name);
+        currentSchoolYear = name;
+        initYearData(name);
+        document.getElementById('newYearName').value = '';
+        saveAllToStorage();
+    }
+
+    function getSelectedClass() {
+        return document.getElementById('currentClassSelect').value || 'ALL';
+    }
+
+    function updateDates() {
+        const curTerm = getCurTermData();
+        curTerm.startDate = document.getElementById('semesterStartDate').value;
+        curTerm.endDate = document.getElementById('semesterEndDate').value;
+        saveAllToStorage();
+    }
+
+    function changeWeek(offset) {
+        currentMonday.setDate(currentMonday.getDate() + (offset * 7));
+        renderCalendar();
+    }
+
+    function resetToToday() {
+        currentMonday = getMonday(new Date());
+        renderCalendar();
+    }
+
+    function jumpToSelectedDate() {
+        const val = document.getElementById('jumpToDatePicker').value;
+        if (val) {
+            currentMonday = getMonday(new Date(val));
+            renderCalendar();
+        }
+    }
+
+    function clearSingleOverrides() {
+        const termName = currentTerm === '1' ? i18n[currentLang].term1 : i18n[currentLang].term2;
+        const msg = currentLang === 'zh' ? 
+            `確定要清空【${currentSchoolYear} ${termName}】所有「調課紀錄」，恢復為固定課表嗎？` :
+            `Clear all rescheduled overrides for ${currentSchoolYear} ${termName}?`;
+        if (confirm(msg)) {
+            getCurTermData().dateOverrides = {};
+            saveAllToStorage();
+        }
+    }
+
+    function addClass() {
+        const name = document.getElementById('newClassName').value.trim();
+        const color = document.getElementById('newClassColor').value;
+        if (!name) return alert(currentLang === 'zh' ? '請輸入科目名稱' : 'Please enter subject name');
+        
+        const curYear = getCurYearData();
+        if (curYear.classes.includes(name)) return alert(currentLang === 'zh' ? '科目已存在' : 'Subject already exists');
+        
+        curYear.classes.push(name);
+        curYear.subjectColors[name] = color;
+        
+        document.getElementById('newClassName').value = '';
+        saveAllToStorage();
+    }
+
+    function updateSubjectColor(subjectName, newColor) {
+        const curYear = getCurYearData();
+        curYear.subjectColors[subjectName] = newColor;
+        saveAllToStorage();
+    }
+
+    function deleteClass() {
+        const name = getSelectedClass();
+        if (name === 'ALL') return alert(currentLang === 'zh' ? '無法刪除「ALL」選項' : 'Cannot delete ALL option');
+        if (confirm(`${i18n[currentLang].deleteConfirm} (${name})`)) {
+            const curYear = getCurYearData();
+            curYear.classes = curYear.classes.filter(c => c !== name);
+            delete curYear.subjectColors[name];
+            saveAllToStorage();
+        }
+    }
+
+    function addBaseScheduleItem() {
+        const day = parseInt(document.getElementById('baseDaySelect').value);
+        const period = parseInt(document.getElementById('basePeriodSelect').value);
+        const className = document.getElementById('baseClassSelect').value;
+
+        if (!className) return alert(currentLang === 'zh' ? '請先新增並選擇科目！' : 'Please select a subject!');
+
+        const curYear = getCurYearData();
+        const exists = curYear.baseSchedule.some(b => b.day === day && b.period === period);
+        if (exists) return alert(currentLang === 'zh' ? '該時段已經有排課了！' : 'Slot already assigned!');
+
+        curYear.baseSchedule.push({ day, period, class: className });
+        saveAllToStorage();
+    }
+
+    function deleteBaseScheduleItem(idx) {
+        if (confirm(i18n[currentLang].deleteConfirm)) {
+            getCurYearData().baseSchedule.splice(idx, 1);
+            saveAllToStorage();
+        }
+    }
+
+    function renderBaseScheduleTable() {
+        const curYear = getCurYearData();
+        const tbody = document.getElementById('baseScheduleTableBody');
+        const daysMap = ['', ...i18n[currentLang].dayNames];
+
+        tbody.innerHTML = curYear.baseSchedule.length === 0 ? 
+            `<tr><td colspan="4" style="text-align:center; color:#888;">${i18n[currentLang].noBaseText}</td></tr>` : '';
+
+        curYear.baseSchedule.forEach((b, idx) => {
+            const subjColor = curYear.subjectColors[b.class] || '#2b579a';
+            tbody.innerHTML += `
+                <tr>
+                    <td>${daysMap[b.day]}</td>
+                    <td>${i18n[currentLang].periodFormat.replace('{p}', b.period)}</td>
+                    <td><strong style="color:${subjColor};">${b.class}</strong></td>
+                    <td><button class="btn-danger btn-sm" onclick="deleteBaseScheduleItem(${idx})">${i18n[currentLang].btnDelete}</button></td>
+                </tr>
+            `;
+        });
+    }
+
+    function toggleAllSyllabusClasses(source) {
+        document.querySelectorAll('.syllabus-class-chk').forEach(chk => {
+            chk.checked = source.checked;
+        });
+        loadSyllabusInputs();
+    }
+
+    function renderSyllabusClassCheckboxes() {
+        const curYear = getCurYearData();
+        const container = document.getElementById('syllabusClassCheckboxGroup');
+        const existingChecked = Array.from(document.querySelectorAll('.syllabus-class-chk:checked')).map(c => c.value);
+        
+        container.innerHTML = curYear.classes.map(c => {
+            const isChecked = existingChecked.length === 0 || existingChecked.includes(c) ? 'checked' : '';
+            return `<label><input type="checkbox" class="syllabus-class-chk" value="${c}" ${isChecked} onchange="loadSyllabusInputs()"> ${c}</label>`;
+        }).join('');
+    }
+
+    function loadSyllabusInputs() {
+        const curTerm = getCurTermData();
+        const checkedClasses = Array.from(document.querySelectorAll('.syllabus-class-chk:checked')).map(c => c.value);
+        
+        if (checkedClasses.length === 0) {
+            document.getElementById('subjectMidInput').value = '';
+            document.getElementById('subjectFinalInput').value = '';
+            document.getElementById('subjectMidWbInput').value = '';
+            document.getElementById('subjectFinalWbInput').value = '';
+            return;
+        }
+
+        const firstClass = checkedClasses[0];
+        const subData = (curTerm.sharedSyllabus && curTerm.sharedSyllabus[firstClass]) || { mid: [], final: [], wbMid: [], wbFinal: [] };
+
+        document.getElementById('subjectMidInput').value = (subData.mid || []).join(', ');
+        document.getElementById('subjectFinalInput').value = (subData.final || []).join(', ');
+        document.getElementById('subjectMidWbInput').value = (subData.wbMid || []).join(', ');
+        document.getElementById('subjectFinalWbInput').value = (subData.wbFinal || []).join(', ');
+    }
+
+    function onSyllabusInputChange() {}
+
+    function saveSyllabus() {
+        const parseList = val => val.split(',').map(s => s.trim()).filter(s => s.length > 0);
+        const curTerm = getCurTermData();
+        const checkedClasses = Array.from(document.querySelectorAll('.syllabus-class-chk:checked')).map(c => c.value);
+
+        if (checkedClasses.length === 0) return alert(currentLang === 'zh' ? '請至少勾選一個要設定進度的科目' : 'Please select at least one subject');
+
+        const newData = {
+            mid: parseList(document.getElementById('subjectMidInput').value),
+            final: parseList(document.getElementById('subjectFinalInput').value),
+            wbMid: parseList(document.getElementById('subjectMidWbInput').value),
+            wbFinal: parseList(document.getElementById('subjectFinalWbInput').value)
+        };
+
+        checkedClasses.forEach(targetClass => {
+            curTerm.sharedSyllabus[targetClass] = JSON.parse(JSON.stringify(newData));
+        });
+
+        saveAllToStorage();
+        alert(i18n[currentLang].saveSyllabusSuccess);
+    }
+
+    function toggleAllExamPeriods(source) {
+        document.querySelectorAll('.exam-period-chk').forEach(chk => chk.checked = source.checked);
+    }
+
+    function saveExam() {
+        const type = document.getElementById('examTypeSelect').value;
+        const date = document.getElementById('examDate').value;
+        const currentClass = getSelectedClass();
+        const chks = document.querySelectorAll('.exam-period-chk:checked');
+        const selectedPeriods = Array.from(chks).map(c => parseInt(c.value));
+
+        if (!date) return alert(currentLang === 'zh' ? '請選擇考試日期' : 'Select exam date');
+        if (selectedPeriods.length === 0) return alert(currentLang === 'zh' ? '請至少選擇一節考試節次' : 'Select at least 1 period');
+
+        const periodsToSave = selectedPeriods.length === 7 ? 'all' : selectedPeriods;
+
+        getCurTermData().examEvents.push({ id: Date.now(), date, type, period: periodsToSave, className: currentClass });
+        
+        document.getElementById('chk-exam-all').checked = false;
+        document.querySelectorAll('.exam-period-chk').forEach(c => c.checked = false);
+        saveAllToStorage();
+    }
+
+    function deleteExam(id) {
+        if (confirm(i18n[currentLang].deleteConfirm)) {
+            const curTerm = getCurTermData();
+            curTerm.examEvents = curTerm.examEvents.filter(e => e.id !== id);
+            saveAllToStorage();
+        }
+    }
+
+    function toggleAllPeriods(source) {
+        document.querySelectorAll('.period-chk').forEach(chk => chk.checked = source.checked);
+    }
+
+    function saveEvent() {
+        const editId = document.getElementById('editingEventId').value;
+        const date = document.getElementById('eventDate').value;
+        const currentClass = getSelectedClass();
+        const title = document.getElementById('eventTitle').value.trim();
+        const chks = document.querySelectorAll('.period-chk:checked');
+        const selectedPeriods = Array.from(chks).map(c => parseInt(c.value));
+
+        if (!date || !title) return alert(currentLang === 'zh' ? '請完整填寫日期與活動名稱' : 'Enter date and title');
+        if (selectedPeriods.length === 0) return alert(currentLang === 'zh' ? '請至少勾選一節課' : 'Select at least 1 period');
+
+        const periodsToSave = selectedPeriods.length === 7 ? 'all' : selectedPeriods;
+        const curTerm = getCurTermData();
+
+        if (editId) {
+            const idx = curTerm.specialEvents.findIndex(e => e.id === parseInt(editId));
+            if (idx !== -1) {
+                curTerm.specialEvents[idx] = { id: parseInt(editId), date, period: periodsToSave, className: currentClass, title };
+            }
+        } else {
+            curTerm.specialEvents.push({ id: Date.now(), date, period: periodsToSave, className: currentClass, title });
+        }
+
+        cancelEditEvent();
+        saveAllToStorage();
+    }
+
+    function editEvent(id) {
+        const ev = getCurTermData().specialEvents.find(e => e.id === id);
+        if (!ev) return;
+
+        document.getElementById('editingEventId').value = ev.id;
+        document.getElementById('eventDate').value = ev.date;
+        document.getElementById('eventTitle').value = ev.title;
+        document.getElementById('currentClassSelect').value = ev.className;
+
+        document.getElementById('saveEventBtn').innerText = currentLang === 'zh' ? '更新活動' : 'Update Event';
+        document.getElementById('cancelEditBtn').style.display = 'inline-block';
+    }
+
+    function cancelEditEvent() {
+        document.getElementById('editingEventId').value = '';
+        document.getElementById('eventTitle').value = '';
+        document.getElementById('chk-all').checked = false;
+        document.querySelectorAll('.period-chk').forEach(c => c.checked = false);
+
+        document.getElementById('saveEventBtn').innerText = i18n[currentLang].btnLogEvent;
+        document.getElementById('cancelEditBtn').style.display = 'none';
+    }
+
+    function deleteEvent(id) {
+        if (confirm(i18n[currentLang].deleteConfirm)) {
+            const curTerm = getCurTermData();
+            curTerm.specialEvents = curTerm.specialEvents.filter(e => e.id !== id);
+            saveAllToStorage();
+        }
+    }
+
+    function isItemMatchingPeriod(item, period) {
+        if (item.period === 'all') return true;
+        if (Array.isArray(item.period)) return item.period.includes(period);
+        return parseInt(item.period) === period;
+    }
+
+    function formatPeriodDisplay(period) {
+        if (period === 'all') return i18n[currentLang].allDayText;
+        if (Array.isArray(period)) {
+            return period.length === 7 ? i18n[currentLang].allDayText : `Period ${period.join(', ')}`;
+        }
+        return `Period ${period}`;
+    }
+
+    function isDefaultSlot(dateStr, period, className) {
+        const d = new Date(dateStr);
+        let dayNum = d.getDay();
+        if (dayNum === 0) dayNum = 7;
+        
+        return getCurYearData().baseSchedule.some(b => 
+            b.day === dayNum && 
+            b.period === parseInt(period) && 
+            b.class === className
+        );
+    }
+
+    function cleanDateOverrideIfDefault(dateStr) {
+        const curTerm = getCurTermData();
+        if (!curTerm.dateOverrides[dateStr]) return;
+
+        const currentSlots = curTerm.dateOverrides[dateStr];
+        const d = new Date(dateStr);
+        let dayNum = d.getDay();
+        if (dayNum === 0) dayNum = 7;
+        const defaultSlots = getCurYearData().baseSchedule.filter(b => b.day === dayNum);
+
+        if (currentSlots.length !== defaultSlots.length) return;
+
+        const isExactMatch = currentSlots.every(cs => {
+            return defaultSlots.some(ds => 
+                ds.period === cs.period && 
+                ds.class === cs.class
+            );
+        });
+
+        if (isExactMatch) {
+            delete curTerm.dateOverrides[dateStr];
+        }
+    }
+
+    function executeReschedule(srcDateStr, srcPeriod, srcClass, targetDateStr, targetPeriod) {
+        targetPeriod = parseInt(targetPeriod);
+        srcPeriod = parseInt(srcPeriod);
+
+        let isSameDate = (srcDateStr === targetDateStr);
+        
+        let srcSlots = getSlotsForDate(srcDateStr);
+        let targetSlots = isSameDate ? srcSlots : getSlotsForDate(targetDateStr);
+
+        let targetExistingIndex = targetSlots.findIndex(s => s.period === targetPeriod);
+        let targetExisting = targetExistingIndex !== -1 ? targetSlots[targetExistingIndex] : null;
+
+        let srcCardIndex = srcSlots.findIndex(s => s.period === srcPeriod && s.class === srcClass);
+        if (srcCardIndex !== -1) {
+            srcSlots.splice(srcCardIndex, 1);
+        }
+
+        const curTerm = getCurTermData();
+
+        if (isSameDate) {
+            if (targetExisting) {
+                targetExisting.period = srcPeriod;
+                targetExisting.isRescheduled = !isDefaultSlot(srcDateStr, srcPeriod, targetExisting.class);
+            }
+            
+            srcSlots.push({
+                class: srcClass,
+                period: targetPeriod,
+                isRescheduled: !isDefaultSlot(targetDateStr, targetPeriod, srcClass)
+            });
+
+            curTerm.dateOverrides[srcDateStr] = srcSlots;
+        } else {
+            if (targetExisting) {
+                targetSlots.splice(targetExistingIndex, 1);
+                srcSlots.push({
+                    class: targetExisting.class,
+                    period: srcPeriod,
+                    isRescheduled: !isDefaultSlot(srcDateStr, srcPeriod, targetExisting.class)
+                });
+            }
+
+            targetSlots.push({
+                class: srcClass,
+                period: targetPeriod,
+                isRescheduled: !isDefaultSlot(targetDateStr, targetPeriod, srcClass)
+            });
+
+            curTerm.dateOverrides[srcDateStr] = srcSlots;
+            curTerm.dateOverrides[targetDateStr] = targetSlots;
+        }
+
+        cleanDateOverrideIfDefault(srcDateStr);
+        cleanDateOverrideIfDefault(targetDateStr);
+
+        saveAllToStorage();
+    }
+
+    function openRescheduleModal(dateStr, period, className) {
+        selectedModalSlot = { dateStr, period, className };
+        const pLabel = i18n[currentLang].periodFormat.replace('{p}', period);
+        
+        document.getElementById('modalSourceInfo').innerHTML = 
+            `<strong>${i18n[currentLang].originalLabel}:</strong> ${dateStr} (${pLabel})<br><strong>Subject:</strong> ${className}`;
+        document.getElementById('targetRescheduleDate').value = dateStr;
+        document.getElementById('targetReschedulePeriod').value = period;
+
+        document.getElementById('rescheduleModal').style.display = 'flex';
+    }
+
+    function closeRescheduleModal() {
+        document.getElementById('rescheduleModal').style.display = 'none';
+        selectedModalSlot = null;
+    }
+
+    function confirmRescheduleModal() {
+        if (!selectedModalSlot) return;
+
+        const targetDate = document.getElementById('targetRescheduleDate').value;
+        const targetPeriod = parseInt(document.getElementById('targetReschedulePeriod').value);
+
+        if (!targetDate) return alert(currentLang === 'zh' ? '請選擇有效的目標日期' : 'Select valid target date');
+
+        executeReschedule(
+            selectedModalSlot.dateStr,
+            selectedModalSlot.period,
+            selectedModalSlot.className,
+            targetDate,
+            targetPeriod
+        );
+
+        closeRescheduleModal();
+    }
+
+    function handleDragStart(e, dateStr, period, className) {
+        draggedData = { dateStr, period, className };
+        e.dataTransfer.setData('text/plain', JSON.stringify(draggedData));
+        e.dataTransfer.effectAllowed = 'move';
+    }
+
+    function handleDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleDragEnter(e) {
+        e.preventDefault();
+        const targetTd = e.currentTarget;
+        if (targetTd.tagName === 'TD') {
+            targetTd.classList.add('drop-target');
+        }
+    }
+
+    function handleDragLeave(e) {
+        const targetTd = e.currentTarget;
+        if (targetTd.tagName === 'TD') {
+            targetTd.classList.remove('drop-target');
+        }
+    }
+
+    function handleDrop(e, targetDateStr, targetPeriod) {
+        e.preventDefault();
+        e.currentTarget.classList.remove('drop-target');
+
+        if (!draggedData) {
+            try {
+                draggedData = JSON.parse(e.dataTransfer.getData('text/plain'));
+            } catch (err) {
+                return;
+            }
+        }
+
+        const { dateStr: srcDateStr, period: srcPeriod, className: srcClass } = draggedData;
+        executeReschedule(srcDateStr, srcPeriod, srcClass, targetDateStr, targetPeriod);
+        draggedData = null;
+    }
+
+    function getSlotsForDate(dateStr) {
+        const curTerm = getCurTermData();
+        if (curTerm.dateOverrides[dateStr]) {
+            return curTerm.dateOverrides[dateStr].map(s => ({ ...s }));
+        }
+        const d = new Date(dateStr);
+        let dayNum = d.getDay();
+        if (dayNum === 0) dayNum = 7;
+        return getCurYearData().baseSchedule.filter(s => s.day === dayNum).map(s => ({ ...s }));
+    }
+
+    function getEarliestMidTermDate() {
+        const curTerm = getCurTermData();
+        const midExams = curTerm.examEvents.filter(e => e.type === '期中考' || e.type === 'Mid-Term Exam').map(e => e.date);
+        if (midExams.length === 0) return '9999-12-31';
+        return midExams.sort()[0];
+    }
+
+    function getLessonInfo(className, targetDateStr, targetPeriod) {
+        const curTerm = getCurTermData();
+        const earliestMidTerm = getEarliestMidTermDate();
+        const isFinalTerm = (targetDateStr >= earliestMidTerm);
+        
+        let count = 0;
+        let start = new Date(isFinalTerm ? earliestMidTerm : curTerm.startDate);
+        let target = new Date(targetDateStr);
+
+        let curr = new Date(start);
+        while (curr <= target) {
+            let dateStr = formatFullDate(curr);
+            let dayNum = curr.getDay();
+
+            if (dayNum >= 1 && dayNum <= 5) {
+                let slots = getSlotsForDate(dateStr).filter(s => s.class === className);
+                
+                slots.forEach(s => {
+                    let isTargetSlot = (dateStr === targetDateStr && s.period === targetPeriod);
+                    if (curr < target || isTargetSlot) {
+                        let hasEvent = curTerm.specialEvents.find(e => 
+                            e.date === dateStr && 
+                            (e.className === className || e.className === 'ALL' || e.className === 'All Subjects') && 
+                            isItemMatchingPeriod(e, s.period)
+                        );
+
+                        let hasExam = curTerm.examEvents.find(e => 
+                            e.date === dateStr && 
+                            (e.className === className || e.className === 'ALL' || e.className === 'All Subjects') && 
+                            isItemMatchingPeriod(e, s.period)
+                        );
+                        
+                        if (!hasEvent && !hasExam) {
+                            if (curr < target || isTargetSlot) count++;
+                        }
+                    }
+                });
+            }
+            curr.setDate(curr.getDate() + 1);
+        }
+
+        const lessonIdx = count > 0 ? count - 1 : 0;
+        
+        const classSyllabus = (curTerm.sharedSyllabus && curTerm.sharedSyllabus[className]) || { mid: [], final: [], wbMid: [], wbFinal: [] };
+        
+        const syllabusList = isFinalTerm ? classSyllabus.final : classSyllabus.mid;
+        const wbList = isFinalTerm ? (classSyllabus.wbFinal || []) : (classSyllabus.wbMid || []);
+
+        let topic = '';
+        if (syllabusList && syllabusList[lessonIdx]) {
+            topic = syllabusList[lessonIdx];
+        } else {
+            topic = `<i>第 ${lessonIdx + 1} 課 (尚未設定)</i>`;
+        }
+
+        let wbAssignment = '';
+        if (wbList && wbList[lessonIdx]) {
+            const rawWb = wbList[lessonIdx].trim();
+            const lowerWb = rawWb.toLowerCase();
+            if (rawWb && lowerWb !== 'none' && lowerWb !== '無' && rawWb !== '-') {
+                wbAssignment = rawWb;
+            }
+        }
+
+        return { topic, wbAssignment };
+    }
+
+    function renderAll() {
+        applyLanguageDOM();
+        updateTermTabStyles();
+        renderSchoolYearSelect();
+        renderClassSelect();
+        renderBaseScheduleTable();
+        renderSyllabusClassCheckboxes();
+        loadSyllabusInputs();
+        renderExamsTable();
+        renderEventsTable();
+        renderCalendar();
+        renderHeaderLegend();
+        renderSubjectColorConfig();
+    }
+
+    function renderHeaderLegend() {
+        const curYear = getCurYearData();
+        const legendBox = document.getElementById('headerLegend');
+        let html = '';
+        for (let [subj, col] of Object.entries(curYear.subjectColors)) {
+            html += `<div class="legend-item"><span class="badge-dot" style="background: ${col};"></span> ${subj}</div>`;
+        }
+        html += `<div class="legend-item"><span class="badge-dot" style="background: #ffc107;"></span> 活動</div>`;
+        html += `<div class="legend-item"><span class="badge-dot" style="background: var(--exam-color);"></span> 考試</div>`;
+        legendBox.innerHTML = html;
+    }
+
+    function renderSubjectColorConfig() {
+        const curYear = getCurYearData();
+        const listContainer = document.getElementById('subjectColorList');
+        let html = '';
+        for (let [subj, col] of Object.entries(curYear.subjectColors)) {
+            html += `
+                <div style="display:inline-flex; align-items:center; gap:4px; background:#fff; padding:3px 8px; border:1px solid #ced4da; border-radius:4px; font-size:0.85rem;">
+                    <span>${subj}</span>
+                    <input type="color" value="${col}" onchange="updateSubjectColor('${subj}', this.value)" style="width:26px; height:24px; padding:0; border:none; cursor:pointer;">
+                </div>
+            `;
+        }
+        listContainer.innerHTML = html;
+    }
+
+    function renderClassSelect() {
+        const curYear = getCurYearData();
+        const curTerm = getCurTermData();
+        const select = document.getElementById('currentClassSelect');
+        const baseClassSel = document.getElementById('baseClassSelect');
+        const current = select.value;
+        
+        let optionsHTML = `<option value="ALL">${i18n[currentLang].allClassesOpt}</option>`;
+        optionsHTML += curYear.classes.map(c => `<option value="${c}">${c}</option>`).join('');
+        
+        select.innerHTML = optionsHTML;
+        if (current && curYear.classes.includes(current)) {
+            select.value = current;
+        } else {
+            select.value = 'ALL';
+        }
+
+        if(baseClassSel) {
+            baseClassSel.innerHTML = curYear.classes.map(c => `<option value="${c}">${c}</option>`).join('');
+        }
+
+        document.getElementById('semesterStartDate').value = curTerm.startDate;
+        document.getElementById('semesterEndDate').value = curTerm.endDate;
+    }
+
+    function renderCalendar() {
+        const curTerm = getCurTermData();
+        const curYear = getCurYearData();
+        const currentClass = getSelectedClass();
+        const tbody = document.getElementById('calendarBody');
+        tbody.innerHTML = '';
+
+        const todayStr = formatFullDate(new Date());
+
+        const weekDates = [];
+        for (let i = 0; i < 5; i++) {
+            const d = new Date(currentMonday);
+            d.setDate(currentMonday.getDate() + i);
+            weekDates.push(d);
+        }
+
+        const dayNames = i18n[currentLang].dayNames;
+        const thIds = ['th-mon', 'th-tue', 'th-wed', 'th-thu', 'th-fri'];
+        
+        weekDates.forEach((d, idx) => {
+            const dateStr = formatFullDate(d);
+            const isToday = (dateStr === todayStr);
+            const thElem = document.getElementById(thIds[idx]);
+            
+            thElem.innerHTML = `${dayNames[idx]}<br><small style="color:var(--primary-color); font-weight:bold;">(${formatDate(d)})</small>`;
+            if (isToday) {
+                thElem.classList.add('is-today-col');
+            } else {
+                thElem.classList.remove('is-today-col');
+            }
+        });
+
+        const termName = currentTerm === '1' ? i18n[currentLang].term1 : i18n[currentLang].term2;
+        const yearDisplay = currentLang === 'en' ? currentSchoolYear.replace('學年', ' Year') : currentSchoolYear;
+        
+        document.getElementById('currentWeekTitle').innerText = 
+            `[${yearDisplay} ${termName}] Week of ${formatDate(weekDates[0])} ~ ${formatDate(weekDates[4])}, ${weekDates[0].getFullYear()}`;
+
+        periodsInfo.forEach(p => {
+            const tr = document.createElement('tr');
+            const periodLabel = i18n[currentLang].periodFormat.replace('{p}', p.period);
+            tr.innerHTML += `<td class="time-col">${periodLabel}<br><small>${p.time}</small></td>`;
+
+            for (let dayIndex = 0; dayIndex < 5; dayIndex++) {
+                const slotDateStr = formatFullDate(weekDates[dayIndex]);
+                const isToday = (slotDateStr === todayStr);
+                const isOutOfRange = (slotDateStr < curTerm.startDate || slotDateStr > curTerm.endDate);
+                
+                let daySlots = getSlotsForDate(slotDateStr);
+                let matchingSlots = daySlots.filter(s => s.period === p.period);
+
+                if (currentClass !== 'ALL') {
+                    matchingSlots = matchingSlots.filter(s => s.class === currentClass);
+                }
+
+                let cellTD = document.createElement('td');
+                if (isToday) cellTD.classList.add('is-today-col');
+                
+                cellTD.addEventListener('dragover', handleDragOver);
+                cellTD.addEventListener('dragenter', handleDragEnter);
+                cellTD.addEventListener('dragleave', handleDragLeave);
+                cellTD.addEventListener('drop', (e) => handleDrop(e, slotDateStr, p.period));
+
+                matchingSlots.forEach(slot => {
+                    const hasEvent = curTerm.specialEvents.find(e => 
+                        e.date === slotDateStr && 
+                        (e.className === slot.class || e.className === 'ALL' || e.className === 'All Subjects') && 
+                        isItemMatchingPeriod(e, p.period)
+                    );
+
+                    const hasExam = curTerm.examEvents.find(e => 
+                        e.date === slotDateStr && 
+                        (e.className === slot.class || e.className === 'ALL' || e.className === 'All Subjects') && 
+                        isItemMatchingPeriod(e, p.period)
+                    );
+
+                    // 取得該科目的自訂顏色
+                    const subjColor = curYear.subjectColors[slot.class] || '#2b579a';
+
+                    let cardClass = '';
+                    let displayTopic = '';
+                    let wbBadgeHTML = '';
+                    let isInteractive = true;
+                    let extraStyle = `background: #fff; border-left: 4px solid ${subjColor}; color: #333;`;
+
+                    if (isOutOfRange) {
+                        cardClass = 'card-out-of-range';
+                        displayTopic = `<i>${i18n[currentLang].offSemesterText}</i>`;
+                        isInteractive = false;
+                        extraStyle = `background: #fff; border-left: 4px dashed #adb5bd; color: #adb5bd;`;
+                    } else if (hasExam) {
+                        cardClass = 'card-exam-bordered';
+                        displayTopic = `📝 ${hasExam.type}`;
+                        isInteractive = false;
+                        extraStyle = `background: #fff; border-left: 4px solid var(--exam-color); color: var(--exam-color);`;
+                    } else if (hasEvent) {
+                        cardClass = 'card-event-bordered';
+                        displayTopic = `🎉 ${hasEvent.title}`;
+                        isInteractive = false;
+                        extraStyle = `background: #fff; border-left: 4px solid #ffc107; color: var(--event-color);`;
+                    } else {
+                        const { topic, wbAssignment } = getLessonInfo(slot.class, slotDateStr, p.period);
+                        displayTopic = topic;
+                        if (wbAssignment) {
+                            wbBadgeHTML = `<div class="wb-badge">📘 ${wbAssignment}</div>`;
+                        }
+                    }
+
+                    const cardDiv = document.createElement('div');
+                    cardDiv.className = `slot-card ${cardClass}`;
+                    cardDiv.setAttribute('style', extraStyle);
+                    
+                    if (isInteractive) {
+                        cardDiv.setAttribute('draggable', 'true');
+                        cardDiv.addEventListener('dragstart', (e) => handleDragStart(e, slotDateStr, p.period, slot.class));
+                        cardDiv.addEventListener('click', () => openRescheduleModal(slotDateStr, p.period, slot.class));
+                    }
+
+                    cardDiv.innerHTML = `
+                        <div class="class-title">
+                            <span style="color: ${subjColor};">${slot.class} ${slot.isRescheduled ? `<span class="rescheduled-tag">${i18n[currentLang].rescheduledTag}</span>` : ''}</span>
+                        </div>
+                        <div class="topic-text">${displayTopic}</div>
+                        ${wbBadgeHTML}
+                    `;
+
+                    cellTD.appendChild(cardDiv);
+                });
+
+                tr.appendChild(cellTD);
+            }
+            tbody.appendChild(tr);
+        });
+    }
+
+    function renderExamsTable() {
+        const curTerm = getCurTermData();
+        const curYear = getCurYearData();
+        const tbody = document.getElementById('examsTableBody');
+        const currentClass = getSelectedClass();
+        
+        let filtered = curTerm.examEvents;
+        if (currentClass !== 'ALL') {
+            filtered = curTerm.examEvents.filter(e => e.className === currentClass || e.className === 'ALL' || e.className === 'All Subjects');
+        }
+
+        tbody.innerHTML = filtered.length === 0 ? 
+            `<tr><td colspan="5" style="text-align:center; color:#888;">${i18n[currentLang].noExamText}</td></tr>` : '';
+
+        filtered.forEach(e => {
+            const classDisplay = (e.className === 'ALL' || e.className === 'All Subjects') ? i18n[currentLang].allClassesOpt : e.className;
+            tbody.innerHTML += `
+                <tr>
+                    <td>${e.date}</td>
+                    <td><strong style="color:var(--exam-color);">${e.type}</strong></td>
+                    <td><strong>${formatPeriodDisplay(e.period)}</strong></td>
+                    <td><strong>${classDisplay}</strong></td>
+                    <td><button class="btn-danger btn-sm" onclick="deleteExam(${e.id})">${i18n[currentLang].btnDelete}</button></td>
+                </tr>
+            `;
+        });
+    }
+
+    function renderEventsTable() {
+        const curTerm = getCurTermData();
+        const tbody = document.getElementById('eventsTableBody');
+        const currentClass = getSelectedClass();
+        
+        let filteredEvents = curTerm.specialEvents;
+        if (currentClass !== 'ALL') {
+            filteredEvents = curTerm.specialEvents.filter(e => e.className === currentClass || e.className === 'ALL' || e.className === 'All Subjects');
+        }
+
+        tbody.innerHTML = filteredEvents.length === 0 ? 
+            `<tr><td colspan="5" style="text-align:center; color:#888;">${i18n[currentLang].noEventText}</td></tr>` : '';
+
+        filteredEvents.items = filteredEvents.forEach(e => {
+            const classDisplay = (e.className === 'ALL' || e.className === 'All Subjects') ? i18n[currentLang].allClassesOpt : e.className;
+            tbody.innerHTML += `
+                <tr>
+                    <td>${e.date}</td>
+                    <td><strong>${formatPeriodDisplay(e.period)}</strong></td>
+                    <td><strong>${classDisplay}</strong></td>
+                    <td>${e.title}</td>
+                    <td>
+                        <button class="btn-warning btn-sm" onclick="editEvent(${e.id})">${i18n[currentLang].btnEdit}</button>
+                        <button class="btn-danger btn-sm" onclick="deleteEvent(${e.id})">${i18n[currentLang].btnDelete}</button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    // Init Application
+    applyLanguageDOM();
+    renderAll();
+</script>
+</body>
+</html>
